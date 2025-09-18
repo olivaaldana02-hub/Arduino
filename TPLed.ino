@@ -11,9 +11,7 @@ void loop() {
     if (lee == "<LED1:1>") {
       digitalWrite(4, HIGH);
       Serial.println("<ESTLED1:1>");
-    } else if (lee == "<LED1:0>") {
-      digitalWrite(4, LOW);
-      Serial.println("<ESTLED1:0>");
+    } 
     }
   }
 }
