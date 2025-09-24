@@ -32,5 +32,18 @@ void setup() {
 }
 
 void loop() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
 
+  float roll  = atan2(a.acceleration.y, a.acceleration.z) * 180 / PI;
+  float pitch = atan(-a.acceleration.x / 
+              sqrt(a.acceleration.y * a.acceleration.y + a.acceleration.z * a.acceleration.z)) * 180 / PI;
+  motores (pitch, roll); 
+  Serial.print("Pitch: ");
+  Serial.print(pitch);
+  Serial.print("°   Roll: ");
+  Serial.print(roll);
+  Serial.println("°");
+
+  delay(100); 
 }
