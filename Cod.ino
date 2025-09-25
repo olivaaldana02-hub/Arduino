@@ -7,7 +7,7 @@ Adafruit _MPU6050 mpu;
 Servo motorh;
 Servo motorv;
 
-void motores (int posX, int posY) {      //puede que necesite int delay
+void motores (int posX, int posY) {      //puede que necesite int delay, aunque uso uno en lectura
   myservoh.write(posX);
   myservov.write(posY);
 }
@@ -32,7 +32,7 @@ void setup() {
 }
 
 void loop() {
-  sensors_event_t a, g, temp;
+  sensors_event_t a, g, temp;                          //está toda la lectura de sensor, creo que está bien acá pero podría ser una función
   mpu.getEvent(&a, &g, &temp);
 
   float roll  = atan2(a.acceleration.y, a.acceleration.z) * 180 / PI;
@@ -41,9 +41,9 @@ void loop() {
   motores (pitch, roll); 
   Serial.print("Pitch: ");
   Serial.print(pitch);
-  Serial.print("°   Roll: ");
+  Serial.print("Roll: ");
   Serial.print(roll);
-  Serial.println("°");
+  //Serial.println("°");
 
   delay(100); 
 }
