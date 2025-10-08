@@ -7,12 +7,13 @@
 
 BluetoothSerial SerialBT;
 Adafruit_MPU6050 mpu;
-Servo myservo;                    /////////
-
+Servo myservoh;                    /////////
+Servo myservov;                   /////////////////////////////
 
 void setup() {
   Serial.begin(115200);
-  myservo.attach(12);              ///////////
+  myservoh.attach(12);              ///////////
+  myservov.attach(14);               ///////////////////////////////
 
   SerialBT.begin("Placuli");
 
@@ -54,7 +55,9 @@ void loop() {
   SerialBT.println("°");
 
   float rollMap = constrain(map(roll,-90,90,0,180),0,180);          //////////////////
-  myservo.write(rollMap);        ////////////
+  myservoh.write(rollMap);        ////////////
+  float pitchMap=constrain(map(pitch,-90,90,0,180),0,180);
+  myservov.write(pitchMap);
 
   delay(50);                    //
 }
