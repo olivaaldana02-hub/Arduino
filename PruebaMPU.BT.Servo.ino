@@ -54,13 +54,10 @@ void loop() {
   SerialBT.print(roll);
   SerialBT.println("°");
 
-  float rollMap = constrain(map(roll,-90,90,0,180),0,180);          //////////////////
-  myservoh.write(rollMap);        ////////////
+  float rollMap = constrain(map(roll,-90,90,0,180),0,180);          
+  myservoh.write(rollMap);        
   float pitchMap=constrain(map(pitch,-90,90,0,180),0,180);
   myservov.write(pitchMap);
 
-  delay(50);                    //
+  delay(20);                    //
 }
-
-
-
