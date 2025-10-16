@@ -4,40 +4,34 @@
 #include <ESP32Servo.h>
 
 Adafruit_MPU6050 mpu;
-Servo myservoh;  // Servo horizontal (Roll)
-Servo myservov;  // Servo vertical (Pitch)
+Servo myservoh;  
+Servo myservov;  
 
-// Timing para envío de tramas
 unsigned long lastSensorSend = 0;
 unsigned long lastMotorSend = 0;
-const unsigned long sensorInterval = 50;   // Envío de inclinación cada 50ms
-const unsigned long motorInterval = 500;   // Envío de estado de motores cada 500ms
+const unsigned long sensorInterval = 50;   
+const unsigned long motorInterval = 500;   
 
-// Variables de modo y estado
 enum Modo { NINGUNO, AUTOMATICO, MANUAL };
 Modo modoActual = NINGUNO;
 
-// Variables para modo MANUAL
-String movimientoTipo = "";      // "H" o "V"
-String movimientoSentido = "";   // "DI", "ID", "AA", "BA"
-int apertura = 0;                // Ángulos de apertura
-int velocidad = 0;               // Velocidad en ms de delay
+String movimientoTipo = "";      // H - V
+String movimientoSentido = "";   // DI - ID - ArA - AbA
+int apertura = 0;                
+int velocidad = 0;               
 bool preparado = false;
 bool ejecutando = false;
 
-// Buffer para recepción de tramas
 String buffer = "";
 
-// Posiciones de servos
-int posH = 90;  // Posición horizontal centrada
-int posV = 90;  // Posición vertical centrada
+int posH = 90;  // centro horizontal 
+int posV = 90;  // centro vertical 
 
 void setup() {
   Serial.begin(115200);
   myservoh.attach(12);
   myservov.attach(14);
 
-  // Centrar servos al inicio
   myservoh.write(90);
   myservov.write(90);
 
@@ -54,31 +48,21 @@ void setup() {
 }
 
 void loop() {
-  // Procesar comandos seriales recibidos
   procesarComandos();
-
-  // Enviar datos de inclinación continuamente
   enviarInclinacion();
 
-  // Ejecutar según modo
   if (modoActual == AUTOMATICO) {
     modoAutomatico();
   } else if (modoActual == MANUAL && ejecutando) {
-    // El movimiento manual se ejecuta una sola vez cuando se llama
     ejecutando = false;
   }
 
   delay(20);
 }
 
-// ==========================
-// COMUNICACIÓN SERIAL
-// ==========================
-
 void procesarComandos() {
   while (Serial.available() > 0) {
     char c = Serial.read();
-    
     if (c == '<') {
       buffer = "";
     } else if (c == '>') {
@@ -100,7 +84,6 @@ void interpretarTrama(String trama) {
   clave.trim();
   valor.trim();
 
-  // Comandos de modo
   if (clave == "MODO") {
     if (valor == "A") {
       modoActual = AUTOMATICO;
@@ -112,12 +95,11 @@ void interpretarTrama(String trama) {
       ejecutando = false;
     }
   }
-  // Configuración MANUAL
   else if (clave == "MOVTIPO") {
     movimientoTipo = valor;  // "H" o "V"
   }
   else if (clave == "MOVSENTIDO") {
-    movimientoSentido = valor;  // "DI", "ID", "AA", "BA"
+    movimientoSentido = valor;  // "DI", "ID", "ArA", "AbA"
   }
   else if (clave == "APERTURA") {
     apertura = valor.toInt();
@@ -125,15 +107,12 @@ void interpretarTrama(String trama) {
   else if (clave == "VELOCIDAD") {
     velocidad = valor.toInt();
   }
-  // Comando PREPARAR
   else if (clave == "PREPARAR" && modoActual == MANUAL) {
     prepararMovimiento();
   }
-  // Comando COMENZAR
   else if (clave == "COMENZAR" && modoActual == MANUAL && preparado) {
     ejecutarMovimiento();
   }
-  // Comando REPETIR
   else if (clave == "REPETIR" && modoActual == MANUAL) {
     prepararMovimiento();
   }
@@ -160,9 +139,6 @@ void enviarInclinacion() {
   Serial.println(">");
 }
 
-// ==========================
-// MODO AUTOMÁTICO
-// ==========================
 
 void modoAutomatico() {
   sensors_event_t a, g, temp;
@@ -172,30 +148,24 @@ void modoAutomatico() {
   float pitch = atan(-a.acceleration.x / sqrt(a.acceleration.y * a.acceleration.y + 
                                                a.acceleration.z * a.acceleration.z)) * 180 / PI;
 
-  // Mapear ángulos a posición servo (invertido para compensar)
   int rollMap  = constrain(map(roll, -90, 90, 180, 0), 0, 180);
   int pitchMap = constrain(map(pitch, -90, 90, 180, 0), 0, 180);
 
-  // Guardar posiciones actuales
   int prevH = posH;
   int prevV = posV;
 
-  // Actualizar posiciones
   posH = rollMap;
   posV = pitchMap;
 
-  // Mover servos
   myservoh.write(posH);
   myservov.write(posV);
 
-  // Enviar estado de motores cada motorInterval
   unsigned long now = millis();
   if (now - lastMotorSend >= motorInterval) {
     lastMotorSend = now;
 
-    // Determinar si hay movimiento (umbral de 3 grados)
-    int motorH = (abs(posH - prevH) > 3) ? 1 : 0;
-    int motorV = (abs(posV - prevV) > 3) ? 1 : 0;
+    int motorH = (abs(posH - prevH) > 2) ? 1 : 0;
+    int motorV = (abs(posV - prevV) > 2) ? 1 : 0;
 
     Serial.print("<MH=");
     Serial.print(motorH);
@@ -207,35 +177,30 @@ void modoAutomatico() {
   }
 }
 
-// ==========================
-// MODO MANUAL
-// ==========================
 
 void prepararMovimiento() {
-  // Posicionar según tipo y sentido de movimiento
-  if (movimientoTipo == "H") {  // Horizontal
-    posV = 90;  // Centrar vertical
+  if (movimientoTipo == "H") {  
+    posV = 90;  
     
-    if (movimientoSentido == "DI") {  // Derecha a Izquierda
+    if (movimientoSentido == "DI") {  
       posH = 180;  // Tope derecha
-    } else if (movimientoSentido == "ID") {  // Izquierda a Derecha
+    } else if (movimientoSentido == "ID") {  
       posH = 0;    // Tope izquierda
     }
   } 
-  else if (movimientoTipo == "V") {  // Vertical
-    posH = 90;  // Centrar horizontal
+  else if (movimientoTipo == "V") {  
+    posH = 90; 
     
-    if (movimientoSentido == "AA") {  // Arriba a Abajo
+    if (movimientoSentido == "ArA") {  
       posV = 0;    // Tope arriba
-    } else if (movimientoSentido == "BA") {  // Abajo a Arriba
+    } else if (movimientoSentido == "AbA") {  
       posV = 180;  // Tope abajo
     }
   }
 
-  // Mover a posición inicial
-  myservoh.write(posH);
+  myservoh.write(posH);         //iniciales del mov
   myservov.write(posV);
-  delay(1000);  // Esperar que llegue a posición
+  delay(1000);                  //le da tiempo
 
   preparado = true;
   Serial.println("<LISTO=1>");
@@ -247,7 +212,6 @@ void ejecutarMovimiento() {
   int posInicial, posFinal;
   Servo* servoActivo;
   
-  // Determinar servo, posición inicial y final
   if (movimientoTipo == "H") {
     servoActivo = &myservoh;
     posInicial = posH;
@@ -258,7 +222,7 @@ void ejecutarMovimiento() {
       posFinal = constrain(apertura, 0, 180);
     }
   } 
-  else {  // V
+  else {  // Vert
     servoActivo = &myservov;
     posInicial = posV;
     
@@ -269,7 +233,6 @@ void ejecutarMovimiento() {
     }
   }
 
-  // Realizar movimiento suave
   int paso = (posInicial < posFinal) ? 1 : -1;
   
   for (int pos = posInicial; pos != posFinal; pos += paso) {
@@ -284,7 +247,6 @@ void ejecutarMovimiento() {
     delay(velocidad);
   }
   
-  // Asegurar llegada a posición final
   servoActivo->write(posFinal);
   if (movimientoTipo == "H") {
     posH = posFinal;
