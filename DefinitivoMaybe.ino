@@ -2,6 +2,14 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <ESP32Servo.h>
+#include <WiFi.h>
+
+// ========== CONFIGURACIÓN WIFI ==========
+const char* ssid = "Galaxy A23";       
+const char* password = "mizg5169";  
+WiFiServer server(80);                       // Servidor en puerto 80
+WiFiClient client;
+bool clienteConectado = false;
 
 Adafruit_MPU6050 mpu;
 Servo myservoh;  
@@ -15,8 +23,8 @@ const unsigned long motorInterval = 500;
 enum Modo { NINGUNO, AUTOMATICO, MANUAL };
 Modo modoActual = NINGUNO;
 
-String movimientoTipo = "";      // H - V
-String movimientoSentido = "";   // DI - ID - ArA - AbA
+String movimientoTipo = "";      
+String movimientoSentido = "";   
 int apertura = 0;                
 int velocidad = 0;               
 bool preparado = false;
@@ -24,11 +32,34 @@ bool ejecutando = false;
 
 String buffer = "";
 
-int posH = 90;  // centro horizontal 
-int posV = 90;  // centro vertical 
+int posH = 90;  
+int posV = 90;  
 
 void setup() {
   Serial.begin(115200);
+  
+  // ========== INICIAR WIFI ==========
+  Serial.println();
+  Serial.print("Conectando a WiFi: ");
+  Serial.println(ssid);
+  
+  WiFi.begin(ssid, password);
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  
+  Serial.println();
+  Serial.println("WiFi conectado!");
+  Serial.print("Dirección IP: ");
+  Serial.println(WiFi.localIP());  // ANOTA ESTA IP PARA TU APP WINDOWS
+  
+  server.begin();
+  Serial.println("Servidor iniciado en puerto 80");
+  Serial.println("Esperando conexión del cliente...");
+  // ====================================
+  
   myservoh.attach(12);
   myservov.attach(14);
 
@@ -48,6 +79,22 @@ void setup() {
 }
 
 void loop() {
+  // ========== MANEJAR CONEXIONES WIFI ==========
+  if (!clienteConectado) {
+    client = server.available();
+    if (client) {
+      Serial.println("Cliente conectado!");
+      clienteConectado = true;
+    }
+  } else {
+    if (!client.connected()) {
+      Serial.println("Cliente desconectado");
+      client.stop();
+      clienteConectado = false;
+    }
+  }
+  // ===========================================
+  
   procesarComandos();
   enviarInclinacion();
   
@@ -65,8 +112,9 @@ void loop() {
 }
 
 void procesarComandos() {
-  while (Serial.available() > 0) {
-    char c = Serial.read();
+  // ========== LEER DESDE WIFI EN LUGAR DE SERIAL ==========
+  while (clienteConectado && client.available() > 0) {
+    char c = client.read();
     if (c == '<') {
       buffer = "";
     } else if (c == '>') {
@@ -76,6 +124,7 @@ void procesarComandos() {
       buffer += c;
     }
   }
+  // ======================================================
 }
 
 void interpretarTrama(String trama) {
@@ -102,10 +151,10 @@ void interpretarTrama(String trama) {
     }
   }
   else if (clave == "MOVTIPO") {
-    movimientoTipo = valor;  // "H" o "V"
+    movimientoTipo = valor;
   }
   else if (clave == "MOVSENTIDO") {
-    movimientoSentido = valor;  // "DI", "ID", "ArA", "AbA"
+    movimientoSentido = valor;
   }
   else if (clave == "APERTURA") {
     apertura = valor.toInt();
@@ -136,13 +185,17 @@ void enviarInclinacion() {
   float pitch = atan(-a.acceleration.x / sqrt(a.acceleration.y * a.acceleration.y + 
                                                a.acceleration.z * a.acceleration.z)) * 180 / PI;
 
-  Serial.print("<PITCH=");
-  Serial.print((int)round(pitch));
-  Serial.println(">");
+  // ========== ENVIAR POR WIFI ==========
+  if (clienteConectado) {
+    client.print("<PITCH=");
+    client.print((int)round(pitch));
+    client.println(">");
 
-  Serial.print("<ROLL=");
-  Serial.print((int)round(roll));
-  Serial.println(">");
+    client.print("<ROLL=");
+    client.print((int)round(roll));
+    client.println(">");
+  }
+  // ====================================
 }
 
 void enviarEstadoMotores() {
@@ -156,13 +209,17 @@ void enviarEstadoMotores() {
     int motorH = (abs(posH - prevH) > 2) ? 1 : 0;
     int motorV = (abs(posV - prevV) > 2) ? 1 : 0;
 
-    Serial.print("<MH=");
-    Serial.print(motorH);
-    Serial.println(">");
+    // ========== ENVIAR POR WIFI ==========
+    if (clienteConectado) {
+      client.print("<MH=");
+      client.print(motorH);
+      client.println(">");
 
-    Serial.print("<MV=");
-    Serial.print(motorV);
-    Serial.println(">");
+      client.print("<MV=");
+      client.print(motorV);
+      client.println(">");
+    }
+    // ====================================
 
     prevH = posH;
     prevV = posV;
@@ -190,33 +247,37 @@ void modoAutomatico() {
   myservov.write(posV);
 }
 
-
 void prepararMovimiento() {
   if (movimientoTipo == "H") {  
     posV = 90;  
     
     if (movimientoSentido == "DI") {  
-      posH = 180;  // Tope derecha
+      posH = 180;
     } else if (movimientoSentido == "ID") {  
-      posH = 0;    // Tope izquierda
+      posH = 0;
     }
   } 
   else if (movimientoTipo == "V") {  
     posH = 90; 
     
     if (movimientoSentido == "ArA") {  
-      posV = 0;    // Tope arriba
+      posV = 0;
     } else if (movimientoSentido == "AbA") {  
-      posV = 180;  // Tope abajo
+      posV = 180;
     }
   }
 
-  myservoh.write(posH);         //iniciales del mov
+  myservoh.write(posH);
   myservov.write(posV);
-  delay(1000);                  //le da tiempo
+  delay(1000);
 
   preparado = true;
-  Serial.println("<LISTO=1>");
+  
+  // ========== ENVIAR POR WIFI ==========
+  if (clienteConectado) {
+    client.println("<LISTO=1>");
+  }
+  // ====================================
 }
 
 void ejecutarMovimiento() {
@@ -231,17 +292,17 @@ void ejecutarMovimiento() {
     
     if (movimientoSentido == "DI") {
       posFinal = constrain(180 - apertura, 0, 180);
-    } else {  // ID
+    } else {
       posFinal = constrain(apertura, 0, 180);
     }
   } 
-  else {  // Vert
+  else {
     servoActivo = &myservov;
     posInicial = posV;
     
     if (movimientoSentido == "ArA") {
       posFinal = constrain(apertura, 0, 180);
-    } else {  // AbA
+    } else {
       posFinal = constrain(180 - apertura, 0, 180);
     }
   }
@@ -268,5 +329,10 @@ void ejecutarMovimiento() {
   }
 
   preparado = false;
-  Serial.println("<FINALIZADO=1>");
+  
+  // ========== ENVIAR POR WIFI ==========
+  if (clienteConectado) {
+    client.println("<FINALIZADO=1>");
+  }
+  // ====================================
 }
