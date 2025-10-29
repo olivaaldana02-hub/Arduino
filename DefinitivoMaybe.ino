@@ -50,6 +50,10 @@ void setup() {
 void loop() {
   procesarComandos();
   enviarInclinacion();
+  
+  if (modoActual != NINGUNO) {
+    enviarEstadoMotores();
+  }
 
   if (modoActual == AUTOMATICO) {
     modoAutomatico();
@@ -89,10 +93,12 @@ void interpretarTrama(String trama) {
       modoActual = AUTOMATICO;
       preparado = false;
       ejecutando = false;
+      lastMotorSend = 0;
     } else if (valor == "M") {
       modoActual = MANUAL;
       preparado = false;
       ejecutando = false;
+      lastMotorSend = 0;
     }
   }
   else if (clave == "MOVTIPO") {
@@ -139,6 +145,29 @@ void enviarInclinacion() {
   Serial.println(">");
 }
 
+void enviarEstadoMotores() {
+  static int prevH = 90;
+  static int prevV = 90;
+  unsigned long now = millis();
+  
+  if (now - lastMotorSend >= motorInterval) {
+    lastMotorSend = now;
+
+    int motorH = (abs(posH - prevH) > 2) ? 1 : 0;
+    int motorV = (abs(posV - prevV) > 2) ? 1 : 0;
+
+    Serial.print("<MH=");
+    Serial.print(motorH);
+    Serial.println(">");
+
+    Serial.print("<MV=");
+    Serial.print(motorV);
+    Serial.println(">");
+
+    prevH = posH;
+    prevV = posV;
+  }
+}
 
 void modoAutomatico() {
   sensors_event_t a, g, temp;
@@ -159,22 +188,6 @@ void modoAutomatico() {
 
   myservoh.write(posH);
   myservov.write(posV);
-
-  unsigned long now = millis();
-  if (now - lastMotorSend >= motorInterval) {
-    lastMotorSend = now;
-
-    int motorH = (abs(posH - prevH) > 2) ? 1 : 0;
-    int motorV = (abs(posV - prevV) > 2) ? 1 : 0;
-
-    Serial.print("<MH=");
-    Serial.print(motorH);
-    Serial.println(">");
-
-    Serial.print("<MV=");
-    Serial.print(motorV);
-    Serial.println(">");
-  }
 }
 
 
@@ -226,9 +239,9 @@ void ejecutarMovimiento() {
     servoActivo = &myservov;
     posInicial = posV;
     
-    if (movimientoSentido == "AA") {
+    if (movimientoSentido == "ArA") {
       posFinal = constrain(apertura, 0, 180);
-    } else {  // BA
+    } else {  // AbA
       posFinal = constrain(180 - apertura, 0, 180);
     }
   }
