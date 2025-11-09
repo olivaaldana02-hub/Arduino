@@ -4,10 +4,9 @@
 #include <ESP32Servo.h>
 #include <WiFi.h>
 
-// ========== CONFIGURACIÓN WIFI ==========
-const char* ssid = "Galaxy A23";       
+const char* ssid = "Celu";       
 const char* password = "mizg5169";  
-WiFiServer server(80);                       // Servidor en puerto 80
+WiFiServer server(80);                      
 WiFiClient client;
 bool clienteConectado = false;
 
@@ -38,7 +37,6 @@ int posV = 90;
 void setup() {
   Serial.begin(115200);
   
-  // ========== INICIAR WIFI ==========
   Serial.println();
   Serial.print("Conectando a WiFi: ");
   Serial.println(ssid);
@@ -53,16 +51,14 @@ void setup() {
   Serial.println();
   Serial.println("WiFi conectado!");
   Serial.print("Dirección IP: ");
-  Serial.println(WiFi.localIP());  // ANOTA ESTA IP PARA TU APP WINDOWS
+  Serial.println(WiFi.localIP());  
   
   server.begin();
   Serial.println("Servidor iniciado en puerto 80");
   Serial.println("Esperando conexión del cliente...");
-  // ====================================
   
   myservoh.attach(12);
   myservov.attach(14);
-
   myservoh.write(90);
   myservov.write(90);
 
@@ -79,7 +75,6 @@ void setup() {
 }
 
 void loop() {
-  // ========== MANEJAR CONEXIONES WIFI ==========
   if (!clienteConectado) {
     client = server.available();
     if (client) {
@@ -93,7 +88,6 @@ void loop() {
       clienteConectado = false;
     }
   }
-  // ===========================================
   
   procesarComandos();
   enviarInclinacion();
@@ -112,7 +106,6 @@ void loop() {
 }
 
 void procesarComandos() {
-  // ========== LEER DESDE WIFI EN LUGAR DE SERIAL ==========
   while (clienteConectado && client.available() > 0) {
     char c = client.read();
     if (c == '<') {
@@ -124,7 +117,6 @@ void procesarComandos() {
       buffer += c;
     }
   }
-  // ======================================================
 }
 
 void interpretarTrama(String trama) {
@@ -185,7 +177,6 @@ void enviarInclinacion() {
   float pitch = atan(-a.acceleration.x / sqrt(a.acceleration.y * a.acceleration.y + 
                                                a.acceleration.z * a.acceleration.z)) * 180 / PI;
 
-  // ========== ENVIAR POR WIFI ==========
   if (clienteConectado) {
     client.print("<PITCH=");
     client.print((int)round(pitch));
@@ -195,7 +186,6 @@ void enviarInclinacion() {
     client.print((int)round(roll));
     client.println(">");
   }
-  // ====================================
 }
 
 void enviarEstadoMotores() {
@@ -209,7 +199,6 @@ void enviarEstadoMotores() {
     int motorH = (abs(posH - prevH) > 2) ? 1 : 0;
     int motorV = (abs(posV - prevV) > 2) ? 1 : 0;
 
-    // ========== ENVIAR POR WIFI ==========
     if (clienteConectado) {
       client.print("<MH=");
       client.print(motorH);
@@ -219,7 +208,6 @@ void enviarEstadoMotores() {
       client.print(motorV);
       client.println(">");
     }
-    // ====================================
 
     prevH = posH;
     prevV = posV;
@@ -273,11 +261,9 @@ void prepararMovimiento() {
 
   preparado = true;
   
-  // ========== ENVIAR POR WIFI ==========
   if (clienteConectado) {
     client.println("<LISTO=1>");
   }
-  // ====================================
 }
 
 void ejecutarMovimiento() {
@@ -330,9 +316,7 @@ void ejecutarMovimiento() {
 
   preparado = false;
   
-  // ========== ENVIAR POR WIFI ==========
   if (clienteConectado) {
     client.println("<FINALIZADO=1>");
   }
-  // ====================================
 }
