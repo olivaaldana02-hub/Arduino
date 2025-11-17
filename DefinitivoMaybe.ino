@@ -58,7 +58,7 @@ void setup() {
   Serial.println("Esperando conexión del cliente...");
   
   myservoh.attach(12);
-  myservov.attach(14);
+  myservov.attach(13);
   myservoh.write(90);
   myservov.write(90);
 
@@ -223,7 +223,7 @@ void modoAutomatico() {
                                                a.acceleration.z * a.acceleration.z)) * 180 / PI;
 
   int rollMap  = constrain(map(roll, -90, 90, 180, 0), 0, 180);
-  int pitchMap = constrain(map(pitch, -90, 90, 180, 0), 0, 180);
+  int pitchMap = constrain(map(pitch, -90, 90, 0, 180), 0, 180);
 
   int prevH = posH;
   int prevV = posV;
